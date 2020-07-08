@@ -2,11 +2,15 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Azure.ServiceBus;
+using Microsoft.Azure.ServiceBus.Management;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+
 
 namespace C4T_assessment.Controllers
 {
@@ -16,26 +20,83 @@ namespace C4T_assessment.Controllers
     {
         private readonly ILogger<CountryController> _logger;
         private readonly HttpClient httpClient;
+        private readonly Lazy<Task<QueueClient>> asyncClient;
+        private  readonly QueueClient queueClient;
+
+
+        const string ServiceBusConnectionString = "Endpoint=sb://bartcleeren.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=cWHxKBuzL10uwXpabfzLRh8+StVppAT5EtaUzV/Rk1c=";
+        const string QueueName = "myQueue";
 
         public CountryController(ILogger<CountryController> logger)
         {
             _logger = logger;
             httpClient = new HttpClient();
+            
+            asyncClient = new Lazy<Task<QueueClient>>(async () =>
+            {
+                var managementClient = new ManagementClient(ServiceBusConnectionString);
+
+                var allQueues = await managementClient.GetQueuesAsync();
+
+                var foundQueue = allQueues.Where(q => q.Path == QueueName.ToLower()).SingleOrDefault();
+
+                if (foundQueue == null)
+                {
+                    await managementClient.CreateQueueAsync(QueueName);//add queue desciption properties
+                }
+
+
+                return new QueueClient(ServiceBusConnectionString, QueueName);
+            });
+
+            queueClient = asyncClient.Value.Result;
         }
 
-        
+
+
+
+        private  async Task SendMessagesAsync(List<CountryModel> messages)
+        {
+            try
+            {
+                foreach (var country in messages.Select((value, index) => new { value, index }))
+                {
+                    // Create a new message to send to the queue.
+                    string messageBody = $"Message {country.index}";
+                    string countryString = JsonConvert.SerializeObject(country.value);
+                    var message = new Message(Encoding.UTF8.GetBytes(countryString));
+
+                    // Write the body of the message to the console.
+                    Console.WriteLine($"Sending message: {countryString}");
+
+                    // Send the message to the queue.
+                    await queueClient.SendAsync(message);
+                }
+            }
+            catch (Exception exception)
+            {
+                Console.WriteLine($"{DateTime.Now} :: Exception: {exception.Message}");
+            }
+
+
+        }
+
 
 
         //Function to recieve country name and start next function to contact restcountries and recieve data from there, and then write this away to the 
         [HttpPost("enquiries")]
-        public List<CountryModel> Post([FromBody] CountryRequest country)
+        public async Task<List<CountryModel>> Post([FromBody] CountryRequest country)
         {
             var userAgent = Request.Headers["User-Agent"];
+            if ( country == null|| country.Name == null || country.Name.Length == 0 ||(country.Name.EndsWith(" ") && country.Name.StartsWith(" ")))
+            {
+                throw new ArgumentNullException("Argument is not defined"); 
+            };
             var result = GetCountryData(country.Name).Result;
+            await SendMessagesAsync(result);
             return result;
-
-           
         }
+
 
         [HttpGet]
         public string Get()
