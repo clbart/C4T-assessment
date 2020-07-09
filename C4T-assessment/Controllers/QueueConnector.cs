@@ -49,7 +49,6 @@ namespace C4T_assessment.Controllers
                     Console.WriteLine($"Sending message {country.index} : {countryString}");
 
                     // Send the message to the queue.
-
                     await queueClient.SendAsync(message);
                 }
             }

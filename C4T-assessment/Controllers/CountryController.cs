@@ -24,8 +24,7 @@ namespace C4T_assessment.Controllers
         private QueueConnector queueConnector;
         private readonly IConfiguration _config;
 
-        const string ServiceBusConnectionString = "Endpoint=sb://bartcleeren.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=cWHxKBuzL10uwXpabfzLRh8+StVppAT5EtaUzV/Rk1c=";
-        const string QueueName = "myQueue";
+     
 
         public CountryController(ILogger<CountryController> logger, IConfiguration config)
         {
@@ -37,11 +36,6 @@ namespace C4T_assessment.Controllers
                 "ConnectionString"), _config.GetValue<string>(
                 "QueueName"));
         }
-
-
-
-
-
 
         //Function to recieve country name and start next function to contact restcountries and recieve data from there, and then write this away to the 
         [HttpPost("enquiries")]
